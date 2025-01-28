@@ -1,12 +1,27 @@
 using Microsoft.EntityFrameworkCore;
-using StudentInfoSys.Models.Inputs;
-using StudentIS.Models;
+using StudentInfoSys.Models;
 
 namespace StudentInfoSys.Services;
 
-public class LectureService
+public interface ILectureService
 {
-    public async Task<Lecture> CreateLecture(AppContext context, CreateLectureInput input)
+    Task<Lecture> CreateLecture(CreateLectureInput input);
+    Task<Lecture> GetLectureByName(string lectureName);
+    Task<List<Lecture>> GetAllLecturesSortedByStudent();
+    Task<Lecture> AddStudentToLecture(string lectureName, Student studentToAdd);
+    Task<Lecture> DeleteLecture(Guid lectureId);
+}
+
+public record CreateLectureInput(
+    string Title,
+    List<Student>? Students,
+    List<Department>? Departments
+);
+
+public class LectureService(UniversityContext context, ILogger<LectureService> logger)
+    : ILectureService
+{
+    public async Task<Lecture> CreateLecture(CreateLectureInput input)
     {
         var lecture = new Lecture
         {
@@ -20,23 +35,31 @@ public class LectureService
         return lecture;
     }
 
-    public Lecture? GetLectureByName(AppContext context, string lectureName)
+    public async Task<Lecture> GetLectureByName(string lectureName)
     {
-        return context.Lectures.AsNoTracking().FirstOrDefault(l => l.Title.Contains(lectureName));
+        var result = await context
+            .Lectures.AsNoTracking()
+            .FirstOrDefaultAsync(l => l.Title.Contains(lectureName));
+
+        if (result is null)
+            throw new NullReferenceException("Lecture not found!");
+
+        return result;
     }
 
-    public async Task<List<Lecture>> GetAllLecturesSortedByStudent(AppContext context)
+    public async Task<List<Lecture>> GetAllLecturesSortedByStudent()
     {
-        return context.Lectures.AsNoTracking().OrderBy(x => x.Students).ToList();
+        var result = await context
+            .Lectures.AsNoTracking()
+            .Include(x => x.Students)
+            .OrderBy(x => x.Students)
+            .ToListAsync();
+        return result;
     }
 
-    public async Task<Lecture> AddStudentToLecture(
-        AppContext context,
-        string lectureName,
-        Student studentToAdd
-    )
+    public async Task<Lecture> AddStudentToLecture(string lectureName, Student studentToAdd)
     {
-        var lecture = GetLectureByName(context, lectureName);
+        var lecture = await GetLectureByName(lectureName);
 
         if (lecture is null)
         {
@@ -51,9 +74,9 @@ public class LectureService
         return lecture;
     }
 
-    public async Task<Lecture> DeleteLecture(AppContext context, Guid lectureId)
+    public async Task<Lecture> DeleteLecture(Guid lectureId)
     {
-        var lecture = context.Lectures.FirstOrDefault(l => l.Id == lectureId);
+        var lecture = await context.Lectures.FirstOrDefaultAsync(l => l.Id == lectureId);
 
         if (lecture is null)
         {

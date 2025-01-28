@@ -1,12 +1,28 @@
 using Microsoft.EntityFrameworkCore;
-using StudentInfoSys.Models.Inputs;
-using StudentIS.Models;
+using StudentInfoSys.Models;
 
 namespace StudentInfoSys.Services;
 
-public class StudentService
+public interface IStudentService
 {
-    public async Task<Student> CreateStudent(AppContext context, CreateStudentInput input)
+    Task<Student> CreateStudent(CreateStudentInput input);
+    Task<Student> GetStudentByName(string studentName);
+
+    Task<Student> ChangeStudentDepartment(string studentName, Department newDepartment);
+
+    Task<Student> AddLectureToStudent(string studentName, Lecture lectureToAdd);
+
+    Task<Student> RemoveLectureFromStudent(string studentName, Lecture lectureToRemove);
+
+    Task<Student> DeleteStudent(Guid studentId);
+}
+
+public record CreateStudentInput(string Name, Guid? DepartmentId, List<Lecture>? Lectures);
+
+public class StudentService(UniversityContext context, ILogger<StudentService> logger)
+    : IStudentService
+{
+    public async Task<Student> CreateStudent(CreateStudentInput input)
     {
         var student = new Student
         {
@@ -22,18 +38,23 @@ public class StudentService
         return student;
     }
 
-    public Student? GetStudentByName(AppContext context, string studentName)
+    public async Task<Student> GetStudentByName(string studentName)
     {
-        return context.Students.AsNoTracking().FirstOrDefault(s => s.Name.Contains(studentName));
+        var result = await context
+            .Students.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Name.Contains(studentName));
+
+        if (result is null)
+        {
+            throw new NullReferenceException("Student not found!");
+        }
+
+        return result;
     }
 
-    public async Task<Student> ChangeStudentDepartment(
-        AppContext context,
-        string studentName,
-        Department newDepartment
-    )
+    public async Task<Student> ChangeStudentDepartment(string studentName, Department newDepartment)
     {
-        var student = GetStudentByName(context, studentName);
+        var student = await GetStudentByName(studentName);
 
         if (student is null)
         {
@@ -41,21 +62,17 @@ public class StudentService
         }
 
         student.DepartmentId = newDepartment.Id;
-        // Does this need to be set? Since it's not set on line 11
-        student.Department = newDepartment;
+        // Does this need to be set? Since it's not set in `CreateStudent` method
+        // student.Department = newDepartment;
 
         await context.SaveChangesAsync();
 
         return student;
     }
 
-    public async Task<Student> AddLectureToStudent(
-        AppContext context,
-        string studentName,
-        Lecture lectureToAdd
-    )
+    public async Task<Student> AddLectureToStudent(string studentName, Lecture lectureToAdd)
     {
-        var student = GetStudentByName(context, studentName);
+        var student = await GetStudentByName(studentName);
 
         if (student is null)
         {
@@ -68,13 +85,9 @@ public class StudentService
         return student;
     }
 
-    public async Task<Student> RemoveLectureFromStudent(
-        AppContext context,
-        string studentName,
-        Lecture lectureToRemove
-    )
+    public async Task<Student> RemoveLectureFromStudent(string studentName, Lecture lectureToRemove)
     {
-        var student = GetStudentByName(context, studentName);
+        var student = await GetStudentByName(studentName);
 
         if (student is null)
         {
@@ -88,25 +101,9 @@ public class StudentService
         return student;
     }
 
-    // public Dictionary<Student, List<Lecture>> GetLecturesByStudent(
-    //     StudentInfoSystemContext context
-    // )
-    // {
-    //     var result = new Dictionary<Student, List<Lecture>>();
-    //     var students = context.Students.ToList();
-    //     var lectures = context.Lectures.ToList();
-    //
-    //     foreach (var student in students)
-    //     {
-    //         result.Add(student,lectures.Where(l=> l.Students.FindAll(s=>s.Id == student.Id)).);
-    //     }
-    //
-    //     return result;
-    // }
-
-    public async Task<Student> DeleteStudent(AppContext context, Guid studentId)
+    public async Task<Student> DeleteStudent(Guid studentId)
     {
-        var student = context.Students.FirstOrDefault(s => s.Id == studentId);
+        var student = await context.Students.FirstOrDefaultAsync(s => s.Id == studentId);
 
         if (student is null)
         {

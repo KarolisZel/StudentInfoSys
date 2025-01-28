@@ -1,12 +1,25 @@
 using Microsoft.EntityFrameworkCore;
-using StudentInfoSys.Models.Inputs;
-using StudentIS.Models;
+using StudentInfoSys.Models;
 
 namespace StudentInfoSys.Services;
 
-public class DepartmentService
+public interface IDepartmentService
 {
-    public async Task<Department> CreateDepartment(AppContext context, CreateDepartmentInput input)
+    Task<Department> CreateDepartment(CreateDepartmentInput input);
+    Task<Department> GetDepartmentByName(string departmentName);
+    Task<List<Student>> GetAllStudentsInDepartment(string departmentName);
+    Task<List<Lecture>> GetAllLecturesInDepartment(string departmentName);
+    Task<Department> AddStudentToDepartment(string departmentName, Student studentToAdd);
+    Task<Department> AddLectureToDepartment(string departmentName, Lecture lectureToAdd);
+    Task<Department> DeleteDepartment(Guid id);
+}
+
+public record CreateDepartmentInput(string Name, List<Student>? Students, List<Lecture>? Lectures);
+
+public class DepartmentService(UniversityContext context, ILogger<DepartmentService> logger)
+    : IDepartmentService
+{
+    public async Task<Department> CreateDepartment(CreateDepartmentInput input)
     {
         var department = new Department
         {
@@ -22,16 +35,21 @@ public class DepartmentService
         return department;
     }
 
-    public Department? GetDepartmentByName(AppContext context, string departmentName)
+    public async Task<Department> GetDepartmentByName(string departmentName)
     {
-        return context
+        var result = await context
             .Departments.AsNoTracking()
-            .FirstOrDefault(d => d.Name.Contains(departmentName));
+            .FirstOrDefaultAsync(d => d.Name.Contains(departmentName));
+
+        if (result is null)
+            throw new NullReferenceException("Department not found!");
+
+        return result;
     }
 
-    public List<Student> GetAllStudentsInDepartment(AppContext context, string departmentName)
+    public async Task<List<Student>> GetAllStudentsInDepartment(string departmentName)
     {
-        var department = GetDepartmentByName(context, departmentName);
+        var department = await GetDepartmentByName(departmentName);
 
         if (department is null)
         {
@@ -41,9 +59,9 @@ public class DepartmentService
         return context.Students.Where(s => s.DepartmentId == department.Id).ToList();
     }
 
-    public List<Lecture> GetAllLecturesInDepartment(AppContext context, string departmentName)
+    public async Task<List<Lecture>> GetAllLecturesInDepartment(string departmentName)
     {
-        var department = GetDepartmentByName(context, departmentName);
+        var department = await GetDepartmentByName(departmentName);
 
         if (department is null)
         {
@@ -54,12 +72,11 @@ public class DepartmentService
     }
 
     public async Task<Department> AddStudentToDepartment(
-        AppContext context,
         string departmentName,
         Student studentToAdd
     )
     {
-        var department = GetDepartmentByName(context, departmentName);
+        var department = await GetDepartmentByName(departmentName);
 
         if (department is null)
             throw new NullReferenceException("Department not found!");
@@ -73,14 +90,11 @@ public class DepartmentService
     }
 
     public async Task<Department> AddLectureToDepartment(
-        AppContext context,
         string departmentName,
         Lecture lectureToAdd
     )
     {
-        var department = await context.Departments.FirstOrDefaultAsync(d =>
-            d.Name == departmentName
-        );
+        var department = await GetDepartmentByName(departmentName);
 
         if (department is null)
             throw new NullReferenceException("Department not found!");
@@ -93,7 +107,7 @@ public class DepartmentService
         return department;
     }
 
-    public async Task<Department> DeleteDepartment(AppContext context, Guid id)
+    public async Task<Department> DeleteDepartment(Guid id)
     {
         var department = await context.Departments.FirstOrDefaultAsync(d => d.Id == id);
 
