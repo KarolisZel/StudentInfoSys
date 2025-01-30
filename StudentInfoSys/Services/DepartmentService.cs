@@ -6,12 +6,12 @@ namespace StudentInfoSys.Services;
 public interface IDepartmentService
 {
     Task<Department> CreateDepartment(CreateDepartmentInput input);
-    Task<Department> GetDepartmentByName(string departmentName);
-    Task<List<Student>> GetAllStudentsInDepartment(string departmentName);
-    Task<List<Lecture>> GetAllLecturesInDepartment(string departmentName);
-    Task<Department> AddStudentToDepartment(string departmentName, Student studentToAdd);
-    Task<Department> AddLectureToDepartment(string departmentName, Lecture lectureToAdd);
-    Task<Department> DeleteDepartment(Guid id);
+    Task<Department?> GetDepartmentByName(string departmentName);
+    Task<List<Student>?> GetAllStudentsInDepartment(string departmentName);
+    Task<List<Lecture>?> GetAllLecturesInDepartment(string departmentName);
+    Task<Department?> AddStudentToDepartment(string departmentName, Student studentToAdd);
+    Task<Department?> AddLectureToDepartment(string departmentName, Lecture lectureToAdd);
+    Task<Department?> DeleteDepartment(Guid id);
 }
 
 public record CreateDepartmentInput(string Name, List<Student>? Students, List<Lecture>? Lectures);
@@ -21,57 +21,61 @@ public class DepartmentService(UniversityContext context, ILogger<DepartmentServ
 {
     public async Task<Department> CreateDepartment(CreateDepartmentInput input)
     {
-        var department = new Department
+        var department = new Department { Name = input.Name, };
+
+        if (input.Students is not null)
         {
-            Name = input.Name,
-            Students = input.Students,
-            Lectures = input.Lectures,
-        };
+            foreach (var student in input.Students)
+            {
+                var existingStudent = await context.Students.FindAsync(student.Id);
+                if (existingStudent is not null)
+                    department.Students?.Add(existingStudent);
+            }
+        }
+
+        if (input.Lectures is not null)
+        {
+            foreach (var lecture in input.Lectures)
+            {
+                var existingLecture = await context.Lectures.FindAsync(lecture.Id);
+                if (existingLecture is not null)
+                    department.Lectures?.Add(existingLecture);
+            }
+        }
 
         context.Departments.Add(department);
-
         await context.SaveChangesAsync();
-
         return department;
     }
 
-    public async Task<Department> GetDepartmentByName(string departmentName)
+    public async Task<Department?> GetDepartmentByName(string departmentName)
     {
         var result = await context
             .Departments.AsNoTracking()
-            .FirstOrDefaultAsync(d => d.Name.Contains(departmentName));
-
-        if (result is null)
-            throw new NullReferenceException("Department not found!");
+            .FirstOrDefaultAsync(d => d.Name.Equals(departmentName));
 
         return result;
     }
 
-    public async Task<List<Student>> GetAllStudentsInDepartment(string departmentName)
+    public async Task<List<Student>?> GetAllStudentsInDepartment(string departmentName)
     {
         var department = await GetDepartmentByName(departmentName);
 
-        if (department is null)
-        {
-            throw new NullReferenceException("Department not found!");
-        }
-
-        return context.Students.Where(s => s.DepartmentId == department.Id).ToList();
+        return department is null
+            ? null
+            : context.Students.Where(s => s.DepartmentId == department.Id).ToList();
     }
 
-    public async Task<List<Lecture>> GetAllLecturesInDepartment(string departmentName)
+    public async Task<List<Lecture>?> GetAllLecturesInDepartment(string departmentName)
     {
         var department = await GetDepartmentByName(departmentName);
 
-        if (department is null)
-        {
-            throw new NullReferenceException("Department not found!");
-        }
-
-        return context.Lectures.Where(l => l.Departments.Contains(department)).ToList();
+        return department is null
+            ? null
+            : context.Lectures.Where(l => l.Departments.Contains(department)).ToList();
     }
 
-    public async Task<Department> AddStudentToDepartment(
+    public async Task<Department?> AddStudentToDepartment(
         string departmentName,
         Student studentToAdd
     )
@@ -79,7 +83,15 @@ public class DepartmentService(UniversityContext context, ILogger<DepartmentServ
         var department = await GetDepartmentByName(departmentName);
 
         if (department is null)
-            throw new NullReferenceException("Department not found!");
+            return null;
+
+        if (studentToAdd.DepartmentId is not null)
+        {
+            var existingDepartment = await context.Departments.FirstOrDefaultAsync(d =>
+                d.Id == studentToAdd.DepartmentId
+            );
+            return existingDepartment;
+        }
 
         department.Students?.Add(studentToAdd);
         studentToAdd.DepartmentId = department.Id;
@@ -89,7 +101,7 @@ public class DepartmentService(UniversityContext context, ILogger<DepartmentServ
         return department;
     }
 
-    public async Task<Department> AddLectureToDepartment(
+    public async Task<Department?> AddLectureToDepartment(
         string departmentName,
         Lecture lectureToAdd
     )
@@ -97,7 +109,7 @@ public class DepartmentService(UniversityContext context, ILogger<DepartmentServ
         var department = await GetDepartmentByName(departmentName);
 
         if (department is null)
-            throw new NullReferenceException("Department not found!");
+            return null;
 
         department.Lectures?.Add(lectureToAdd);
         lectureToAdd.Departments?.Add(department);
@@ -107,13 +119,31 @@ public class DepartmentService(UniversityContext context, ILogger<DepartmentServ
         return department;
     }
 
-    public async Task<Department> DeleteDepartment(Guid id)
+    public async Task<Department?> DeleteDepartment(Guid id)
     {
-        var department = await context.Departments.FirstOrDefaultAsync(d => d.Id == id);
+        var department = await context
+            .Departments.Include(d => d.Students)
+            .Include(d => d.Lectures)
+            .FirstOrDefaultAsync(d => d.Id == id);
 
         if (department is null)
+            return null;
+
+        if (department.Students is not null)
         {
-            throw new NullReferenceException("Department not found!");
+            foreach (var student in department.Students)
+            {
+                student.Department = null;
+                student.DepartmentId = null;
+            }
+        }
+
+        if (department.Lectures is not null)
+        {
+            foreach (var lecture in department.Lectures)
+            {
+                lecture.Departments?.Remove(department);
+            }
         }
 
         context.Departments.Remove(department);

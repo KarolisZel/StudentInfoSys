@@ -12,14 +12,22 @@ public class Student()
     public List<Lecture>? Lectures { get; set; }
 
     public StudentDto ToDto() =>
-        new StudentDto
+        new()
         {
             Id = Id,
             Name = Name,
             DepartmentId = DepartmentId,
             Department = Department?.ToDto(),
+            Lectures = Lectures?.Select(l => l.ToDto()).ToList() ?? new List<LectureDto>(),
         };
 
-    public Student FromDto(StudentDto dto) =>
-        new() { Name = dto.Name, DepartmentId = dto.DepartmentId, };
+    public static Student FromDto(StudentDto dto) =>
+        new()
+        {
+            Id = dto.Id,
+            Name = dto.Name,
+            DepartmentId = dto.DepartmentId,
+            Department = dto.Department != null ? Department.FromDto(dto.Department) : null,
+            Lectures = dto.Lectures?.Select(Lecture.FromDto).ToList() ?? new List<Lecture>(),
+        };
 }
