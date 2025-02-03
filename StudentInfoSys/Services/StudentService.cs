@@ -6,13 +6,14 @@ namespace StudentInfoSys.Services;
 public interface IStudentService
 {
     Task<Student> CreateStudent(CreateStudentInput input);
-    Task<Student?> GetStudentByName(string studentName);
+    Task<List<Student>> GetAllStudents();
+    Task<Student?> GetStudentById(Guid studentId);
 
-    Task<Student?> ChangeStudentDepartment(string studentName, Department newDepartment);
+    Task<Student?> ChangeStudentDepartment(Guid studentId, Guid newDepartmentId);
 
-    Task<Student?> AddLectureToStudent(string studentName, Lecture lectureToAdd);
+    Task<Student?> AddLectureToStudent(Guid studentId, Guid lectureToAddId);
 
-    Task<Student?> RemoveLectureFromStudent(string studentName, Lecture lectureToRemove);
+    Task<Student?> RemoveLectureFromStudent(Guid studentId, Guid lectureToRemoveId);
 
     Task<Student?> DeleteStudent(Guid studentId);
 }
@@ -41,57 +42,74 @@ public class StudentService(UniversityContext context, ILogger<StudentService> l
         return student;
     }
 
-    public async Task<Student?> GetStudentByName(string studentName)
+    public async Task<List<Student>> GetAllStudents()
     {
-        var result = await context
-            .Students.AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Name.Equals(studentName));
+        var result = await context.Students.AsNoTracking().Include(s => s.Lectures).ToListAsync();
 
         return result;
     }
 
-    public async Task<Student?> ChangeStudentDepartment(
-        string studentName,
-        Department newDepartment
-    )
+    public async Task<Student?> GetStudentById(Guid studentId)
     {
-        var student = await GetStudentByName(studentName);
+        var result = await context
+            .Students.AsNoTracking()
+            .Where(s => s.Id == studentId)
+            .Include(s => s.Lectures)
+            .FirstAsync();
+
+        return result;
+    }
+
+    public async Task<Student?> ChangeStudentDepartment(Guid studentId, Guid newDepartmentId)
+    {
+        var student = await context
+            .Students.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == studentId);
 
         if (student is null)
             return null;
 
-        student.DepartmentId = newDepartment.Id;
+        student.DepartmentId = newDepartmentId;
         student.Lectures?.Clear();
+
         await context.SaveChangesAsync();
 
         return student;
     }
 
-    public async Task<Student?> AddLectureToStudent(string studentName, Lecture lectureToAdd)
+    public async Task<Student?> AddLectureToStudent(Guid studentId, Guid lectureToAddId)
     {
-        var student = await GetStudentByName(studentName);
+        var student = await context
+            .Students.AsNoTracking()
+            .Where(s => s.Id == studentId)
+            .Include(s => s.Lectures)
+            .FirstAsync();
 
-        if (student is null)
-            return null;
+        if (student.Lectures.Any(l => l.Id == lectureToAddId))
+            return student;
 
+        var lectureToAdd = new Lecture { Id = lectureToAddId };
+
+        context.Lectures.Attach(lectureToAdd);
         student.Lectures?.Add(lectureToAdd);
-        lectureToAdd.Students?.Add(student);
 
         await context.SaveChangesAsync();
 
         return student;
     }
 
-    public async Task<Student?> RemoveLectureFromStudent(
-        string studentName,
-        Lecture lectureToRemove
-    )
+    public async Task<Student?> RemoveLectureFromStudent(Guid studentId, Guid lectureToRemoveId)
     {
-        var student = await GetStudentByName(studentName);
+        var student = await context
+            .Students.AsNoTracking()
+            .Where(s => s.Id == studentId)
+            .Include(s => s.Lectures)
+            .FirstAsync();
 
-        if (student is null)
-            return null;
+        if (!student.Lectures.Any(l => l.Id == lectureToRemoveId))
+            return student;
 
+        var lectureToRemove = new Lecture { Id = lectureToRemoveId };
         student.Lectures?.Remove(lectureToRemove);
 
         await context.SaveChangesAsync();

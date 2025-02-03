@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using StudentInfoSys.Contracts;
 
 namespace StudentInfoSys.Models;
@@ -5,9 +6,12 @@ namespace StudentInfoSys.Models;
 public class Lecture()
 {
     public Guid Id { get; set; }
-    public required string Title { get; set; }
+    public string Title { get; set; }
 
+    [JsonIgnore]
     public List<Student>? Students { get; set; }
+
+    [JsonIgnore]
     public List<Department>? Departments { get; set; }
 
     public LectureDto ToDto() =>

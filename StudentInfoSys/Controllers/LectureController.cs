@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using StudentInfoSys.Models;
 using StudentInfoSys.Services;
 
 namespace StudentInfoSys.Controllers;
@@ -19,14 +18,22 @@ public class LectureController(ILectureService lectureService) : ControllerBase
         );
     }
 
-    [HttpGet("{lectureName}")]
-    public async Task<IActionResult> GetLectureByName(string lectureName)
+    [HttpGet]
+    public async Task<IActionResult> GetAllLectures()
     {
-        var lecture = await lectureService.GetLectureByName(lectureName);
-        if (lecture == null)
-            return NotFound($"Lecture with name '{lectureName}' not found.");
+        var lectures = await lectureService.GetAllLectures();
 
-        return Ok(lecture.ToDto());
+        return Ok(lectures);
+    }
+
+    [HttpGet("{lectureId}")]
+    public async Task<IActionResult> GetLectureByName(Guid lectureId)
+    {
+        var lecture = await lectureService.GetLectureById(lectureId);
+        if (lecture == null)
+            return NotFound($"Lecture with name '{lectureId}' not found.");
+
+        return Ok(lecture);
     }
 
     [HttpGet("sorted")]
@@ -36,17 +43,14 @@ public class LectureController(ILectureService lectureService) : ControllerBase
         return Ok(lectures);
     }
 
-    [HttpPost("{lectureName}/students")]
-    public async Task<IActionResult> AddStudentToLecture(
-        string lectureName,
-        [FromBody] Student studentToAdd
-    )
+    [HttpPost("{lectureId}/students")]
+    public async Task<IActionResult> AddStudentToLecture(Guid lectureId, Guid studentToAddId)
     {
-        var lecture = await lectureService.AddStudentToLecture(lectureName, studentToAdd);
+        var lecture = await lectureService.AddStudentToLecture(lectureId, studentToAddId);
         if (lecture == null)
-            return NotFound($"Lecture '{lectureName}' not found.");
+            return NotFound($"Lecture '{lectureId}' not found.");
 
-        return Ok(lecture.ToDto());
+        return Ok(lecture);
     }
 
     [HttpDelete("{lectureId:guid}")]
@@ -56,6 +60,6 @@ public class LectureController(ILectureService lectureService) : ControllerBase
         if (lecture == null)
             return NotFound($"Lecture with ID '{lectureId}' not found.");
 
-        return Ok(lecture.ToDto()); // 204 No Content
+        return Ok(lecture);
     }
 }

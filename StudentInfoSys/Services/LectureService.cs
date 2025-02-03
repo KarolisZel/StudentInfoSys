@@ -6,9 +6,10 @@ namespace StudentInfoSys.Services;
 public interface ILectureService
 {
     Task<Lecture> CreateLecture(CreateLectureInput input);
-    Task<Lecture?> GetLectureByName(string lectureName);
+    Task<List<Lecture>> GetAllLectures();
+    Task<Lecture?> GetLectureById(Guid lectureId);
     Task<List<Lecture>?> GetAllLecturesSortedByStudent();
-    Task<Lecture?> AddStudentToLecture(string lectureName, Student studentToAdd);
+    Task<Lecture?> AddStudentToLecture(Guid lectureId, Guid studentToAddId);
     Task<Lecture?> DeleteLecture(Guid lectureId);
 }
 
@@ -51,11 +52,25 @@ public class LectureService(UniversityContext context, ILogger<LectureService> l
         return lecture;
     }
 
-    public async Task<Lecture?> GetLectureByName(string lectureName)
+    public async Task<List<Lecture>> GetAllLectures()
     {
         var result = await context
             .Lectures.AsNoTracking()
-            .FirstOrDefaultAsync(l => l.Title.Equals(lectureName));
+            .Include(l => l.Students)
+            .Include(l => l.Departments)
+            .ToListAsync();
+
+        return result;
+    }
+
+    public async Task<Lecture?> GetLectureById(Guid lectureId)
+    {
+        var result = await context
+            .Lectures.AsNoTracking()
+            .Where(l => l.Id == lectureId)
+            .Include(l => l.Students)
+            .Include(l => l.Departments)
+            .FirstAsync();
 
         return result;
     }
@@ -70,15 +85,24 @@ public class LectureService(UniversityContext context, ILogger<LectureService> l
         return result;
     }
 
-    public async Task<Lecture?> AddStudentToLecture(string lectureName, Student studentToAdd)
+    public async Task<Lecture?> AddStudentToLecture(Guid lectureId, Guid studentToAddId)
     {
-        var lecture = await GetLectureByName(lectureName);
+        var lecture = await context
+            .Lectures.AsNoTracking()
+            .Where(l => l.Id == lectureId)
+            .Include(l => l.Students)
+            .FirstAsync();
 
         if (lecture is null)
             return null;
 
+        if (lecture.Students.Any(s => s.Id == studentToAddId))
+            return lecture;
+
+        var studentToAdd = new Student { Id = studentToAddId };
+
+        context.Students.Attach(studentToAdd);
         lecture.Students?.Add(studentToAdd);
-        studentToAdd.Lectures?.Add(lecture);
 
         await context.SaveChangesAsync();
 

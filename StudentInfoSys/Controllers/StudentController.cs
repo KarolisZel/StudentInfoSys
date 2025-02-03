@@ -13,50 +13,49 @@ public class StudentController(IStudentService studentService) : ControllerBase
     {
         var student = await studentService.CreateStudent(input);
         return CreatedAtAction(
-            nameof(GetStudentByName),
-            new { studentName = student.Name },
+            nameof(GetStudentById),
+            new { studentId = student.Id },
             student.ToDto()
         );
     }
 
-    [HttpGet("{studentName}")]
-    public async Task<IActionResult> GetStudentByName(string studentName)
+    [HttpGet]
+    public async Task<IActionResult> GetAllStudents()
     {
-        var student = await studentService.GetStudentByName(studentName);
+        var students = await studentService.GetAllStudents();
+
+        return Ok(students);
+    }
+
+    [HttpGet("{studentId}")]
+    public async Task<IActionResult> GetStudentById(Guid studentId)
+    {
+        var student = await studentService.GetStudentById(studentId);
         if (student == null)
-            return NotFound($"Student with name '{studentName}' not found.");
+            return NotFound($"Student with name '{studentId}' not found.");
 
-        return Ok(student.ToDto());
+        return Ok(student);
     }
 
-    [HttpPut("{studentName}/department")]
-    public async Task<IActionResult> ChangeStudentDepartment(
-        string studentName,
-        [FromBody] Department newDepartment
-    )
+    [HttpPut("{studentId}/department")]
+    public async Task<IActionResult> ChangeStudentDepartment(Guid studentId, Guid newDepartmentId)
     {
-        var student = await studentService.ChangeStudentDepartment(studentName, newDepartment);
-        return Ok(student.ToDto());
+        var student = await studentService.ChangeStudentDepartment(studentId, newDepartmentId);
+        return Ok(student);
     }
 
-    [HttpPost("{studentName}/lectures")]
-    public async Task<IActionResult> AddLectureToStudent(
-        string studentName,
-        [FromBody] Lecture lecture
-    )
+    [HttpPost("{studentId}/lectures")]
+    public async Task<IActionResult> AddLectureToStudent(Guid studentId, Guid lectureId)
     {
-        var student = await studentService.AddLectureToStudent(studentName, lecture);
-        return Ok(student.ToDto());
+        var student = await studentService.AddLectureToStudent(studentId, lectureId);
+        return Ok(student);
     }
 
-    [HttpDelete("{studentName}/lectures")]
-    public async Task<IActionResult> RemoveLectureFromStudent(
-        string studentName,
-        [FromBody] Lecture lecture
-    )
+    [HttpDelete("{studentId}/lectures")]
+    public async Task<IActionResult> RemoveLectureFromStudent(Guid studentId, Guid lectureId)
     {
-        var student = await studentService.RemoveLectureFromStudent(studentName, lecture);
-        return Ok(student.ToDto());
+        var student = await studentService.RemoveLectureFromStudent(studentId, lectureId);
+        return Ok(student);
     }
 
     [HttpDelete("{studentId:guid}")]
@@ -67,6 +66,6 @@ public class StudentController(IStudentService studentService) : ControllerBase
         {
             return NotFound($"Student with ID '{studentId}' not found.");
         }
-        return Ok(student.ToDto());
+        return Ok(student);
     }
 }
