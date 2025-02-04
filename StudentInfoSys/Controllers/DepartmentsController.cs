@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using StudentInfoSys.Models;
 using StudentInfoSys.Services;
 
 namespace StudentInfoSys.Controllers;

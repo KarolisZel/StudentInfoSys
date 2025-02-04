@@ -70,9 +70,7 @@ public class StudentService(UniversityContext context, ILogger<StudentService> l
         Guid newDepartmentId
     )
     {
-        var student = await context
-            .Students.AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == studentId);
+        var student = await context.Students.FirstOrDefaultAsync(s => s.Id == studentId);
 
         if (student is null)
             return null;

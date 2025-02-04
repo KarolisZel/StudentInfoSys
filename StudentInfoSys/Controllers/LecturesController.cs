@@ -10,11 +10,7 @@ public class LecturesController(ILectureService lectureService) : ControllerBase
     public async Task<IActionResult> CreateLecture([FromBody] CreateLectureInput input)
     {
         var lecture = await lectureService.CreateLectureAsync(input);
-        return CreatedAtAction(
-            nameof(GetLectureById),
-            new { lectureName = lecture.Title },
-            lecture
-        );
+        return CreatedAtAction(nameof(GetLectureById), new { lectureId = lecture.Id }, lecture);
     }
 
     [HttpGet("lectures")]
