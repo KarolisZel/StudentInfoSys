@@ -1,16 +1,17 @@
 using Microsoft.EntityFrameworkCore;
+using StudentInfoSys.Contracts;
 using StudentInfoSys.Models;
 
 namespace StudentInfoSys.Services;
 
 public interface ILectureService
 {
-    Task<Lecture> CreateLecture(CreateLectureInput input);
-    Task<List<Lecture>> GetAllLectures();
-    Task<Lecture?> GetLectureById(Guid lectureId);
-    Task<List<Lecture>?> GetAllLecturesSortedByStudent();
-    Task<Lecture?> AddStudentToLecture(Guid lectureId, Guid studentToAddId);
-    Task<Lecture?> DeleteLecture(Guid lectureId);
+    Task<LectureDto> CreateLectureAsync(CreateLectureInput input);
+    Task<List<LectureDto>> GetAllLecturesAsync();
+    Task<LectureDto?> GetLectureByIdAsync(Guid lectureId);
+    Task<List<LectureDto>?> GetAllLecturesSortedByStudentAsync();
+    Task<LectureDto?> AddStudentToLectureAsync(Guid lectureId, Guid studentToAddId);
+    Task<LectureDto?> DeleteLectureAsync(Guid lectureId);
 }
 
 public record CreateLectureInput(
@@ -22,94 +23,93 @@ public record CreateLectureInput(
 public class LectureService(UniversityContext context, ILogger<LectureService> logger)
     : ILectureService
 {
-    public async Task<Lecture> CreateLecture(CreateLectureInput input)
+    public async Task<LectureDto> CreateLectureAsync(CreateLectureInput input)
     {
         var lecture = new Lecture { Title = input.Title, };
 
         if (input.Students is not null)
         {
-            foreach (var student in input.Students)
-            {
-                var existingStudent = await context.Students.FindAsync(student.Id);
-                if (existingStudent is not null)
-                    lecture.Students?.Add(existingStudent);
-            }
+            var studentIds = input.Students.Select(x => x.Id).ToArray();
+
+            var existingStudents = input.Students.Where(x => studentIds.Contains(x.Id)).ToArray();
+
+            if (existingStudents.Length > 0)
+                lecture.Students?.AddRange(existingStudents);
         }
 
         if (input.Departments is not null)
         {
-            lecture.Departments = new List<Department>();
-            foreach (var department in input.Departments)
-            {
-                var existingDepartment = await context.Departments.FindAsync(department.Id);
-                if (existingDepartment is not null)
-                    lecture.Departments.Add(existingDepartment);
-            }
+            var studentIds = input.Departments.Select(x => x.Id).ToArray();
+
+            var existingDepartments = input
+                .Departments.Where(x => studentIds.Contains(x.Id))
+                .ToArray();
+
+            if (existingDepartments.Length > 0)
+                lecture.Departments?.AddRange(existingDepartments);
         }
 
         context.Lectures.Add(lecture);
         await context.SaveChangesAsync();
-        return lecture;
+        return lecture.ToDto();
     }
 
-    public async Task<List<Lecture>> GetAllLectures()
+    public async Task<List<LectureDto>> GetAllLecturesAsync()
     {
         var result = await context
             .Lectures.AsNoTracking()
             .Include(l => l.Students)
             .Include(l => l.Departments)
+            .Select(x => x.ToDto())
             .ToListAsync();
 
         return result;
     }
 
-    public async Task<Lecture?> GetLectureById(Guid lectureId)
+    public async Task<LectureDto?> GetLectureByIdAsync(Guid lectureId)
     {
         var result = await context
             .Lectures.AsNoTracking()
-            .Where(l => l.Id == lectureId)
             .Include(l => l.Students)
             .Include(l => l.Departments)
-            .FirstAsync();
+            .FirstOrDefaultAsync(l => l.Id == lectureId);
 
-        return result;
+        return result.ToDto();
     }
 
-    public async Task<List<Lecture>?> GetAllLecturesSortedByStudent()
+    public async Task<List<LectureDto>?> GetAllLecturesSortedByStudentAsync()
     {
         var result = await context
             .Lectures.AsNoTracking()
             .Include(x => x.Students)
             .OrderBy(x => x.Students.Count)
+            .Select(x => x.ToDto())
             .ToListAsync();
         return result;
     }
 
-    public async Task<Lecture?> AddStudentToLecture(Guid lectureId, Guid studentToAddId)
+    public async Task<LectureDto?> AddStudentToLectureAsync(Guid lectureId, Guid studentToAddId)
     {
         var lecture = await context
-            .Lectures.AsNoTracking()
-            .Where(l => l.Id == lectureId)
-            .Include(l => l.Students)
-            .FirstAsync();
+            .Lectures.Include(l => l.Students)
+            .FirstOrDefaultAsync(l => l.Id == lectureId);
 
         if (lecture is null)
             return null;
 
         if (lecture.Students.Any(s => s.Id == studentToAddId))
-            return lecture;
+            return lecture.ToDto();
 
         var studentToAdd = new Student { Id = studentToAddId };
 
-        context.Students.Attach(studentToAdd);
         lecture.Students?.Add(studentToAdd);
 
         await context.SaveChangesAsync();
 
-        return lecture;
+        return lecture.ToDto();
     }
 
-    public async Task<Lecture?> DeleteLecture(Guid lectureId)
+    public async Task<LectureDto?> DeleteLectureAsync(Guid lectureId)
     {
         var lecture = await context
             .Lectures.Include(l => l.Departments)
@@ -139,6 +139,6 @@ public class LectureService(UniversityContext context, ILogger<LectureService> l
 
         await context.SaveChangesAsync();
 
-        return lecture;
+        return lecture.ToDto();
     }
 }

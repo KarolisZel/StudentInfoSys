@@ -1,10 +1,8 @@
 namespace StudentInfoSys.Contracts;
 
-public class StudentDto
+public class StudentNoExtraDto
 {
     public Guid Id { get; set; }
     public required string Name { get; set; }
     public Guid? DepartmentId { get; set; }
-    public DepartmentDto? Department { get; set; }
-    public List<LectureNoExtraDto>? Lectures { get; set; }
 }

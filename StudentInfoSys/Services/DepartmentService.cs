@@ -1,18 +1,19 @@
 using Microsoft.EntityFrameworkCore;
+using StudentInfoSys.Contracts;
 using StudentInfoSys.Models;
 
 namespace StudentInfoSys.Services;
 
 public interface IDepartmentService
 {
-    Task<Department> CreateDepartment(CreateDepartmentInput input);
-    Task<List<Department>> GetAllDepartments();
-    Task<Department?> GetDepartmentById(Guid departmentId);
-    Task<List<Student>?> GetAllStudentsInDepartment(Guid departmentId);
-    Task<List<Lecture>?> GetAllLecturesInDepartment(Guid departmentId);
-    Task<Department?> AddStudentToDepartment(Guid departmentId, Guid studentToAddId);
-    Task<Department?> AddLectureToDepartment(Guid departmentId, Guid lectureToAddId);
-    Task<Department?> DeleteDepartment(Guid id);
+    Task<DepartmentDto> CreateDepartmentAsync(CreateDepartmentInput input);
+    Task<List<DepartmentDto>> GetAllDepartmentsAsync();
+    Task<DepartmentDto?> GetDepartmentByIdAsync(Guid departmentId);
+    Task<List<StudentDto>?> GetAllStudentsInDepartmentAsync(Guid departmentId);
+    Task<List<LectureDto>?> GetAllLecturesInDepartmentAsync(Guid departmentId);
+    Task<DepartmentDto?> AddStudentToDepartmentAsync(Guid departmentId, Guid studentToAddId);
+    Task<DepartmentDto?> AddLectureToDepartmentAsync(Guid departmentId, Guid lectureToAddId);
+    Task<DepartmentDto?> DeleteDepartmentAsync(Guid id);
 }
 
 public record CreateDepartmentInput(string Name, List<Student>? Students, List<Lecture>? Lectures);
@@ -20,131 +21,131 @@ public record CreateDepartmentInput(string Name, List<Student>? Students, List<L
 public class DepartmentService(UniversityContext context, ILogger<DepartmentService> logger)
     : IDepartmentService
 {
-    public async Task<Department> CreateDepartment(CreateDepartmentInput input)
+    public async Task<DepartmentDto> CreateDepartmentAsync(CreateDepartmentInput input)
     {
         var department = new Department { Name = input.Name, };
 
         if (input.Students is not null)
         {
-            foreach (var student in input.Students)
-            {
-                var existingStudent = await context.Students.FindAsync(student.Id);
-                if (existingStudent is not null)
-                    department.Students?.Add(existingStudent);
-            }
+            var studentIds = input.Students.Select(x => x.Id).ToArray();
+
+            var existingStudents = input.Students.Where(x => studentIds.Contains(x.Id)).ToArray();
+
+            if (existingStudents.Length > 0)
+                department.Students?.AddRange(existingStudents);
         }
 
         if (input.Lectures is not null)
         {
-            foreach (var lecture in input.Lectures)
-            {
-                var existingLecture = await context.Lectures.FindAsync(lecture.Id);
-                if (existingLecture is not null)
-                    department.Lectures?.Add(existingLecture);
-            }
+            var lectureIds = input.Lectures.Select(x => x.Id).ToArray();
+
+            var existingLectures = input.Lectures.Where(x => lectureIds.Contains(x.Id)).ToArray();
+
+            if (existingLectures.Length > 0)
+                department.Lectures?.AddRange(existingLectures);
         }
 
         context.Departments.Add(department);
+
         await context.SaveChangesAsync();
-        return department;
+
+        return department.ToDto();
     }
 
-    public async Task<List<Department>> GetAllDepartments()
+    public async Task<List<DepartmentDto>> GetAllDepartmentsAsync()
     {
         var departments = await context
             .Departments.AsNoTracking()
             .Include(d => d.Lectures)
             .Include(d => d.Students)
+            .Select(x => x.ToDto())
             .ToListAsync();
 
         return departments;
     }
 
-    public async Task<Department?> GetDepartmentById(Guid departmentId)
+    public async Task<DepartmentDto?> GetDepartmentByIdAsync(Guid departmentId)
     {
         var result = await context
             .Departments.AsNoTracking()
-            .Where(d => d.Id == departmentId)
             .Include(d => d.Lectures)
             .Include(d => d.Students)
-            .FirstAsync();
+            .FirstOrDefaultAsync(d => d.Id == departmentId);
 
-        return result;
+        return result.ToDto();
     }
 
-    public async Task<List<Student>?> GetAllStudentsInDepartment(Guid departmentId)
+    public async Task<List<StudentDto>?> GetAllStudentsInDepartmentAsync(Guid departmentId)
     {
         var department = await context
             .Departments.AsNoTracking()
-            .Where(d => d.Id == departmentId)
             .Include(d => d.Students)
-            .FirstAsync();
+            .FirstOrDefaultAsync(d => d.Id == departmentId);
 
-        return department.Students?.ToList();
+        return department.Students?.Select(x => x.ToDto()).ToList();
     }
 
-    public async Task<List<Lecture>?> GetAllLecturesInDepartment(Guid departmentId)
+    public async Task<List<LectureDto>?> GetAllLecturesInDepartmentAsync(Guid departmentId)
     {
         var department = await context
             .Departments.AsNoTracking()
-            .Where(d => d.Id == departmentId)
             .Include(d => d.Lectures)
-            .FirstAsync();
+            .FirstOrDefaultAsync(d => d.Id == departmentId);
 
-        return department.Lectures?.ToList();
+        return department.Lectures?.Select(x => x.ToDto()).ToList();
     }
 
-    public async Task<Department?> AddStudentToDepartment(Guid departmentId, Guid studentToAddId)
+    public async Task<DepartmentDto?> AddStudentToDepartmentAsync(
+        Guid departmentId,
+        Guid studentToAddId
+    )
     {
         var department = await context
-            .Departments.AsNoTracking()
-            .Where(d => d.Id == departmentId)
-            .Include(d => d.Students)
-            .FirstAsync();
+            .Departments.Include(d => d.Students)
+            .FirstOrDefaultAsync(d => d.Id == departmentId);
 
         if (department is null)
             return null;
 
         if (department.Students.Any(s => s.Id == studentToAddId))
-            return department;
+            return department.ToDto();
 
         var studentToAdd = new Student { Id = studentToAddId };
 
-        context.Students.Attach(studentToAdd);
         department.Students?.Add(studentToAdd);
 
         studentToAdd.DepartmentId = departmentId;
 
         await context.SaveChangesAsync();
 
-        return department;
+        return department.ToDto();
     }
 
-    public async Task<Department?> AddLectureToDepartment(Guid departmentId, Guid lectureToAddId)
+    public async Task<DepartmentDto?> AddLectureToDepartmentAsync(
+        Guid departmentId,
+        Guid lectureToAddId
+    )
     {
         var department = await context
-            .Departments.AsNoTracking()
-            .Where(d => d.Id == departmentId)
-            .Include(d => d.Lectures)
-            .FirstAsync();
+            .Departments.Include(d => d.Lectures)
+            .FirstOrDefaultAsync(d => d.Id == departmentId);
 
         if (department is null)
             return null;
 
         if (department.Lectures.Any(l => l.Id == lectureToAddId))
-            return department;
+            return department.ToDto();
 
         var lectureToAdd = new Lecture { Id = lectureToAddId };
 
-        context.Lectures.Attach(lectureToAdd);
         department.Lectures?.Add(lectureToAdd);
 
         await context.SaveChangesAsync();
 
-        return department;
+        return department.ToDto();
     }
 
-    public async Task<Department?> DeleteDepartment(Guid id)
+    public async Task<DepartmentDto?> DeleteDepartmentAsync(Guid id)
     {
         var department = await context
             .Departments.Include(d => d.Students)
@@ -175,6 +176,6 @@ public class DepartmentService(UniversityContext context, ILogger<DepartmentServ
 
         await context.SaveChangesAsync();
 
-        return department;
+        return department.ToDto();
     }
 }

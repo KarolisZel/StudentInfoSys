@@ -10,10 +10,8 @@ public class Student()
 
     public Guid? DepartmentId { get; set; }
 
-    [JsonIgnore]
     public Department? Department { get; set; }
 
-    [JsonIgnore]
     public List<Lecture>? Lectures { get; set; }
 
     public StudentDto ToDto() =>
@@ -23,16 +21,15 @@ public class Student()
             Name = Name,
             DepartmentId = DepartmentId,
             Department = Department?.ToDto(),
-            Lectures = Lectures?.Select(l => l.ToDto()).ToList() ?? new List<LectureDto>(),
+            Lectures =
+                Lectures?.Select(l => l.ToNoExtraDto()).ToList() ?? new List<LectureNoExtraDto>(),
         };
 
-    public static Student FromDto(StudentDto dto) =>
+    public StudentNoExtraDto ToNoExtraDto() =>
         new()
         {
-            Id = dto.Id,
-            Name = dto.Name,
-            DepartmentId = dto.DepartmentId,
-            Department = dto.Department != null ? Department.FromDto(dto.Department) : null,
-            Lectures = dto.Lectures?.Select(Lecture.FromDto).ToList() ?? new List<Lecture>(),
+            Id = Id,
+            Name = Name,
+            DepartmentId = DepartmentId
         };
 }

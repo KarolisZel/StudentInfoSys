@@ -5,79 +5,78 @@ using StudentInfoSys.Services;
 namespace StudentInfoSys.Controllers;
 
 [ApiController]
-[Route("departments")]
-public class DepartmentController(IDepartmentService departmentService) : ControllerBase
+public class DepartmentsController(IDepartmentService departmentService) : ControllerBase
 {
-    [HttpPost]
+    [HttpPost("department")]
     public async Task<IActionResult> CreateDepartment([FromBody] CreateDepartmentInput input)
     {
-        var department = await departmentService.CreateDepartment(input);
+        var department = await departmentService.CreateDepartmentAsync(input);
         return CreatedAtAction(
             nameof(GetDepartmentById),
             new { departmentId = department.Id },
-            department.ToDto()
+            department
         );
     }
 
-    [HttpGet]
+    [HttpGet("departments")]
     public async Task<IActionResult> GetAllDepartments()
     {
-        var departments = await departmentService.GetAllDepartments();
+        var departments = await departmentService.GetAllDepartmentsAsync();
 
         return Ok(departments);
     }
 
-    [HttpGet("{departmentId}")]
+    [HttpGet("department/{departmentId:guid}")]
     public async Task<IActionResult> GetDepartmentById(Guid departmentId)
     {
-        var department = await departmentService.GetDepartmentById(departmentId);
-        if (department == null)
+        var department = await departmentService.GetDepartmentByIdAsync(departmentId);
+        if (department is null)
             return NotFound($"Department with name '{departmentId}' not found");
 
         return Ok(department);
     }
 
-    [HttpGet("{departmentId}/students")]
+    [HttpGet("{departmentId:guid}/students")]
     public async Task<IActionResult> GetAllStudentsInDepartment(Guid departmentId)
     {
-        var students = await departmentService.GetAllStudentsInDepartment(departmentId);
-        if (students == null)
+        var students = await departmentService.GetAllStudentsInDepartmentAsync(departmentId);
+        if (students is null)
             return NotFound($"No students found in department '{departmentId}'.");
 
         return Ok(students);
     }
 
-    [HttpGet("{departmentId}/lectures")]
+    [HttpGet("{departmentId:guid}/lectures")]
     public async Task<IActionResult> GetAllLecturesInDepartment(Guid departmentId)
     {
-        var lectures = await departmentService.GetAllLecturesInDepartment(departmentId);
-        if (lectures == null)
+        var lectures = await departmentService.GetAllLecturesInDepartmentAsync(departmentId);
+        if (lectures is null)
             return NotFound($"No lectures found in department '{departmentId}'.");
 
         return Ok(lectures);
     }
 
-    [HttpPost("{departmentId}/students")]
+    [HttpPost("{departmentId:guid}/students")]
     public async Task<IActionResult> AddStudentToDepartment(Guid departmentId, Guid studentToAddId)
     {
-        var department = await departmentService.AddStudentToDepartment(
+        var department = await departmentService.AddStudentToDepartmentAsync(
             departmentId,
             studentToAddId
         );
-        if (department == null)
+        if (department is null)
             return NotFound($"Department '{departmentId}' not found.");
 
         return Ok(department);
     }
 
-    [HttpPost("{departmentId}/lectures")]
+    [HttpPost("{departmentId:guid}/lectures")]
     public async Task<IActionResult> AddLectureToDepartment(Guid departmentId, Guid lectureToAddId)
     {
-        var department = await departmentService.AddLectureToDepartment(
+        var department = await departmentService.AddLectureToDepartmentAsync(
             departmentId,
             lectureToAddId
         );
-        if (department == null)
+        if (department is null)
             return NotFound($"Department '{departmentId}' not found.");
 
         return Ok(department);
@@ -86,10 +85,10 @@ public class DepartmentController(IDepartmentService departmentService) : Contro
     [HttpDelete("{departmentId:guid}")]
     public async Task<IActionResult> DeleteDepartment(Guid departmentId)
     {
-        var department = await departmentService.DeleteDepartment(departmentId);
-        if (department == null)
+        var department = await departmentService.DeleteDepartmentAsync(departmentId);
+        if (department is null)
             return NotFound($"Department with ID '{departmentId}' not found.");
 
-        return Ok(department.ToDto());
+        return Ok(department);
     }
 }
